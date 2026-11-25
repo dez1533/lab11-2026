@@ -1,62 +1,73 @@
+import os
 import pandas as pd
 
-# Завдання для всіх варіантів
-# 1. Завантажити дані з файлу data/sales_data.csv у DataFrame.
-# 2. Вивести перші 5 рядків DataFrame, отримати загальну інформацію про нього та статистичні характеристики числових стовпців.
-
-# Ваш код починається тут
-
-# 1. Завантаження даних
-df = pd.read_csv('data/sales_data.csv', parse_dates=['date'])
-
-# 2. Первинний аналіз даних
-print("Перші 5 рядків:")
-print(df.head())
-print("\nЗагальна інформація:")
-df.info()
-print("\nСтатистичні характеристики:")
-print(df.describe())
+# Автоматичний шлях до файлу data/sales_data.csv відносно src/lab11.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "..", "data", "sales_data.csv")
 
 
-# Подальший код для вашого варіанту
+def main():
+    # --- Завдання для всіх варіантів ---
+    # 1. Завантаження даних з файлу sales_data.csv у DataFrame
+    df = pd.read_csv(DATA_PATH, parse_dates=["date"])
 
-# Приклад виконання завдання (з лекції)
-# Розкоментуйте та адаптуйте для свого варіанту
+    # 2. Первинний аналіз даних
+    print("=== Перші 5 рядків ===")
+    print(df.head())
 
-# # 3. Фільтрація даних
-# filtered_df = df[(df['store_id'] == 1) & (df['quantity'] > 2)]
-# print("\nВідфільтровані дані:")
-# print(filtered_df)
-#
-# # 4. Сортування даних
-# sorted_df = df.sort_values(by=['date', 'order_id'], ascending=[True, False])
-# print("\nВідсортовані дані:")
-# print(sorted_df)
-#
-# # 5. Групування та агрегування даних
-# grouped_df = df.groupby(['store_id', 'product_id'])['quantity'].sum().reset_index()
-# print("\nЗгруповані дані:")
-# print(grouped_df)
-#
-# # 6. Додавання стовпця
-# # Спочатку обробимо пропущені значення в 'price', щоб уникнути помилок
-# df['price'] = df.groupby('store_id')['price'].transform(lambda x: x.fillna(x.mean()))
-# df['total_amount'] = df['quantity'] * df['price']
-# print("\nДані з новим стовпцем total_amount:")
-# print(df)
-#
-# # 7. Видалення стовпців
-# df_after_drop = df.drop(columns=['order_id', 'product_id'])
-# print("\nДані після видалення стовпців:")
-# print(df_after_drop)
-#
-# # 8. Обробка пропущених значень (вже частково зроблено)
-# # df['price'] = df.groupby('store_id')['price'].transform(lambda x: x.fillna(x.mean()))
-# print("\nДані після заповнення пропущених значень в 'price':")
-# print(df)
-#
-# # 9. Створення зведеної таблиці
-# df['month'] = df['date'].dt.month
-# pivot_table = df.pivot_table(values='total_amount', index='store_id', columns='month', aggfunc='sum')
-# print("\nЗведена таблиця:")
-# print(pivot_table)
+    print("\n=== Загальна інформація про DataFrame ===")
+    df.info()
+
+    print("\n=== Статистичні характеристики числових стовпців ===")
+    print(df.describe())
+
+    # --- Варіант 8 ---
+    # 1. Вибрати рядки, де date є останнім днем місяця
+    month_end_df = df[df["date"].dt.is_month_end]
+    print("\n=== 1. Рядки, де date є останнім днем місяця ===")
+    print(month_end_df.head(10))
+    print(f"Всього знайдено рядків: {len(month_end_df)}")
+
+    # 2. Відсортувати дані за price (зростання), а потім за quantity (спадання)
+    sorted_df = df.sort_values(by=["price", "quantity"], ascending=[True, False])
+    print("\n=== 2. Відсортовані дані (price ↑, quantity ↓) ===")
+    print(sorted_df.head(10))
+
+    # 3. Згрупувати за product_id та обчислити коефіцієнт варіації (std / mean) для price
+    cv_price = df.groupby("product_id")["price"].agg(lambda x: x.std() / x.mean())
+    print("\n=== 3. Коефіцієнт варіації ціни (price) для кожного product_id ===")
+    print(cv_price)
+
+    # 4. Додати стовпець year, який містить рік, витягнутий з date
+    df["year"] = df["date"].dt.year
+    print("\n=== 4. Дані з новим стовпцем year ===")
+    print(df[["order_id", "date", "year"]].head())
+
+    # 5. Видалити рядки, де quantity дорівнює 1
+    df = df[df["quantity"] != 1].copy()
+    print(f"\n=== 5. Рядки з quantity == 1 видалено. Залишилось рядків: {len(df)} ===")
+
+    # 6. Обчислити total_amount та замінити пропущені значення (NaN) на середнє для відповідного store_id та product_id
+    df["total_amount"] = df["quantity"] * df["price"]
+    nan_before = df["total_amount"].isna().sum()
+
+    df["total_amount"] = df.groupby(["store_id", "product_id"])["total_amount"].transform(
+        lambda x: x.fillna(x.mean())
+    )
+    nan_after = df["total_amount"].isna().sum()
+    print(f"\n=== 6. Обробка NaN у total_amount: було {nan_before}, стало {nan_after} ===")
+    print(df[["store_id", "product_id", "quantity", "price", "total_amount"]].head(10))
+
+    # 7. Зведена таблиця: рядки - year, стовпці - store_id, комірки - максимальна виручка (total_amount)
+    pivot_table = df.pivot_table(
+        values="total_amount",
+        index="year",
+        columns="store_id",
+        aggfunc="max"
+    )
+    print("\n=== 7. Зведена таблиця (максимальна виручка total_amount за роками та магазинами) ===")
+    print(pivot_table)
+
+
+if __name__ == "__main__":
+    main()
